@@ -17,7 +17,17 @@ Both projects work together: this server handles client connections and session 
 cargo run
 ```
 
-The server starts listening for WebSocket connections. You can connect with any WebSocket client or use the HTML visualizer from the `test_client/` folder in the main project.
+The server starts listening for WebSocket connections.
+
+## Web Client
+
+There's a web-based visualizer in the `client/` folder. Just open `client/game_visualizer.html` in your browser while the server is running.
+
+The visualizer lets you:
+- Configure maze size, zombie count, seed, and braid probability
+- Watch the simulation in real time
+- See vision cones, planned paths, and agent trails
+- Step through the simulation manually or let it run automatically
 
 ## Protocol
 

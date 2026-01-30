@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Scape - Live Game Visualizer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+        }
+
+        .controls {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: inline-block;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            background: #1a1a1a;
+            border: 1px solid #4CAF50;
+            color: #e0e0e0;
+            border-radius: 4px;
+        }
+
+        input[type="text"] {
+            width: 150px;
+            padding: 5px;
+            background: #1a1a1a;
+            border: 1px solid #4CAF50;
+            color: #e0e0e0;
+            border-radius: 4px;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        button.stop {
+            background: #d32f2f;
+        }
+
+        button.stop:hover {
+            background: #b71c1c;
+        }
+
+        .canvas-container {
+            text-align: center;
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        canvas {
+            border: 2px solid #4CAF50;
+            background: #fff;
+            max-width: 100%;
+        }
+
+        .status {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .status-item {
+            display: inline-block;
+            margin-right: 30px;
+            margin-bottom: 10px;
+        }
+
+        .status-label {
+            font-weight: bold;
+            color: #4CAF50;
+            margin-right: 5px;
+        }
+
+        .status-value {
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .status-running {
+            color: #FFC107;
+        }
+
+        .status-won {
+            color: #4CAF50;
+        }
+
+        .status-lost {
+            color: #f44336;
+        }
+
+        .legend {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 1px solid #666;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        #message {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .error {
+            background: #d32f2f !important;
+        }
+
+        .success {
+            background: #4CAF50 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧟 Zombie Scape - Live Game Visualizer</h1>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="wsUrl">WebSocket URL:</label>
+                <input type="text" id="wsUrl" value="ws://127.0.0.1:8080">
+            </div>
+            <div class="control-group">
+                <label for="mazeSize">Maze Size:</label>
+                <input type="number" id="mazeSize" value="15" min="5" max="50">
+            </div>
+            <div class="control-group">
+                <label for="mazeSeed">Seed:</label>
+                <input type="number" id="mazeSeed" value="42">
+            </div>
+            <div class="control-group">
+                <label for="zombieCount">Zombies:</label>
+                <input type="number" id="zombieCount" value="0" min="0" max="10">
+            </div>
+            <div class="control-group">
+                <label for="braidProb">Braid Probability:</label>
+                <input type="number" id="braidProb" value="0.3" min="0" max="1" step="0.1">
+            </div>
+            <br>
+            <button id="connectBtn" onclick="connect()">🔌 Connect & Start</button>
+            <button id="stopBtn" onclick="stop()" class="stop" disabled>⏹ Stop</button>
+            <button id="stepBtn" onclick="singleStep()" disabled>▶️ Single Step</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div class="status">
+            <div class="status-item">
+                <span class="status-label">Connection:</span>
+                <span class="status-value" id="connectionStatus">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Session:</span>
+                <span class="status-value" id="sessionId">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Step:</span>
+                <span class="status-value" id="stepCount">0</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Status:</span>
+                <span class="status-value" id="gameStatus">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Fugitive:</span>
+                <span class="status-value" id="fugitivePos">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Exit:</span>
+                <span class="status-value" id="exitPos">-</span>
+            </div>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="legend">
+            <h3>Legend</h3>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #333;"></span>
+                <span>Wall</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #fff;"></span>
+                <span>Walkable</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #4CAF50;"></span>
+                <span>🚩 Start</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #f44336;"></span>
+                <span>🎯 Exit</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #2196F3;"></span>
+                <span>🏃 Fugitive</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #9C27B0;"></span>
+                <span>🧟 Zombie</span>
+            </div>
+            <div class="legend-item">
+                <span style="margin-left: 20px; color: #FFC107;">●</span>
+                <span> = Fugitive Trail</span>
+            </div>
+            <div class="legend-item">
+                <span style="margin-left: 20px; color: #9C27B0; font-size: 20px;">◔</span>
+                <span> = Zombie Vision Cone</span>
+            </div>
+            <div class="legend-item">
+                <span style="margin-left: 20px; color: #FFC107;">⊗</span>
+                <span> = Last Seen Position</span>
+            </div>
+            <div class="legend-item">
+                <span style="margin-left: 20px; color: #2196F3;">----</span>
+                <span> = Fugitive Path (A*)</span>
+            </div>
+            <div class="legend-item">
+                <span style="margin-left: 20px; color: #9C27B0;">----</span>
+                <span> = Zombie Path (Dijkstra)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sessionId = null;
+        let gameState = null;
+        let mazeGrid = null;  // Store maze structure (received once)
+        let isRunning = false;
+        let animationFrame = null;
+        let trail = [];  // Store fugitive trail
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const CELL_SIZE = 30;
+
+        function showMessage(msg, type = 'info') {
+            const msgDiv = document.getElementById('message');
+            msgDiv.textContent = msg;
+            msgDiv.className = type;
+            msgDiv.style.display = 'block';
+        }
+
+        function clearMessage() {
+            document.getElementById('message').style.display = 'none';
+        }
+
+        async function connect() {
+            clearMessage();
+            const url = document.getElementById('wsUrl').value;
+
+            showMessage('Connecting to server...', 'info');
+            document.getElementById('connectionStatus').textContent = 'Connecting...';
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    document.getElementById('connectionStatus').textContent = 'Connected';
+                    showMessage('Connected! Creating session...', 'success');
+                    createSession();
+                };
+
+                ws.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    handleMessage(msg);
+                };
+
+                ws.onerror = (error) => {
+                    showMessage('WebSocket error: ' + error, 'error');
+                    document.getElementById('connectionStatus').textContent = 'Error';
+                };
+
+                ws.onclose = () => {
+                    document.getElementById('connectionStatus').textContent = 'Disconnected';
+                    isRunning = false;
+                    updateButtons();
+                };
+
+            } catch (error) {
+                showMessage('Failed to connect: ' + error.message, 'error');
+            }
+        }
+
+        function createSession() {
+            const size = parseInt(document.getElementById('mazeSize').value);
+            const seed = parseInt(document.getElementById('mazeSeed').value);
+            const zombieCount = parseInt(document.getElementById('zombieCount').value);
+            const braidProb = parseFloat(document.getElementById('braidProb').value);
+
+            const msg = {
+                type: 'create_session',
+                config: {
+                    maze_width: size,
+                    maze_height: size,
+                    zombie_count: zombieCount,
+                    fugitive_speed: 1.0,  // Fugitive is faster
+                    zombie_speed: 1.0,    // Zombies are slower but pursue
+                    capture_radius: 0.2,
+                    maze_seed: seed,
+                    cell_size: 1.0,
+                    braid_probability: braidProb,
+
+                }
+            };
+
+            ws.send(JSON.stringify(msg));
+        }
+
+        function handleMessage(msg) {
+            if (msg.type === 'session_created') {
+                sessionId = msg.session_id;
+                gameState = msg.initial_state;
+                mazeGrid = msg.maze_grid;  // Store the maze structure
+                document.getElementById('sessionId').textContent = sessionId.substring(0, 8);
+
+                showMessage('Session created! Starting simulation...', 'success');
+
+                trail = [];  // Reset trail
+                renderGame();
+                isRunning = true;
+                updateButtons();
+                runSimulation();
+
+            } else if (msg.type === 'state_update') {
+                gameState = msg.state;
+
+                // Add current position to trail
+                const pos = gameState.fugitive.position;
+                trail.push({ x: pos[0], y: pos[1] });
+
+                // Limit trail length
+                if (trail.length > 100) {
+                    trail.shift();
+                }
+
+                renderGame();
+                updateStatus();
+
+                // Check if game ended
+                if (gameState.status !== 'running') {
+                    isRunning = false;
+                    updateButtons();
+
+                    if (gameState.status === 'fugitive_won') {
+                        showMessage('🎉 Fugitive reached the exit!', 'success');
+                    } else if (gameState.status === 'zombies_captured') {
+                        showMessage('💀 Fugitive was caught by zombies!', 'error');
+                    }
+                }
+
+            } else if (msg.type === 'error') {
+                showMessage('Server error: ' + msg.message, 'error');
+                isRunning = false;
+                updateButtons();
+            }
+        }
+
+        function runSimulation() {
+            if (!isRunning || !sessionId) return;
+
+            const msg = {
+                type: 'step_simulation',
+                session_id: sessionId,
+                steps: 5  // Step 5 frames at a time for smooth animation
+            };
+
+            ws.send(JSON.stringify(msg));
+
+            // Continue stepping
+            setTimeout(() => {
+                if (isRunning) {
+                    runSimulation();
+                }
+            }, 6);  // ~10 updates per second
+        }
+
+        function singleStep() {
+            if (!sessionId) return;
+
+            const msg = {
+                type: 'step_simulation',
+                session_id: sessionId,
+                steps: 1
+            };
+
+            ws.send(JSON.stringify(msg));
+        }
+
+        function stop() {
+            isRunning = false;
+            updateButtons();
+            showMessage('Simulation paused', 'info');
+        }
+
+        function updateButtons() {
+            document.getElementById('connectBtn').disabled = ws && ws.readyState === WebSocket.OPEN;
+            document.getElementById('stopBtn').disabled = !isRunning;
+            document.getElementById('stepBtn').disabled = !sessionId || isRunning;
+        }
+
+        function updateStatus() {
+            if (!gameState) return;
+
+            document.getElementById('stepCount').textContent = gameState.step;
+
+            const status = gameState.status;
+            const statusEl = document.getElementById('gameStatus');
+            statusEl.textContent = status;
+            statusEl.className = 'status-value status-' + status.replace('_', '-');
+
+            const fugPos = gameState.fugitive.position;
+            document.getElementById('fugitivePos').textContent =
+                `[${fugPos[0].toFixed(2)}, ${fugPos[1].toFixed(2)}]`;
+
+            const exitPos = gameState.maze_info.exit_position;
+            document.getElementById('exitPos').textContent =
+                `[${exitPos[0].toFixed(2)}, ${exitPos[1].toFixed(2)}]`;
+        }
+
+        function renderGame() {
+            if (!gameState || !mazeGrid) return;
+
+            const mazeInfo = gameState.maze_info;
+            const gridHeight = mazeGrid.length;
+            const gridWidth = mazeGrid[0].length;
+
+            // Set canvas size
+            canvas.width = gridWidth * CELL_SIZE;
+            canvas.height = gridHeight * CELL_SIZE;
+
+            // Clear canvas
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the actual maze structure
+            drawMaze();
+
+            // Draw start marker
+            const start = mazeInfo.start_position;
+            drawMarker(start[0], start[1], '#4CAF50', '🚩');
+
+            // Draw exit marker
+            const exit = mazeInfo.exit_position;
+            drawMarker(exit[0], exit[1], '#f44336', '🎯');
+
+            // Draw zombie vision cones (BEFORE agents so they appear behind)
+            gameState.zombies.forEach(zombie => {
+                if (zombie.agent_type === 'zombie') {
+                    drawVisionCone(zombie);
+                }
+            });
+
+            // Draw agent paths
+            gameState.zombies.forEach(zombie => {
+                if (zombie.agent_type === 'zombie' && zombie.current_path) {
+                    drawAgentPath(zombie.current_path, '#9C27B0', 0.4);
+                }
+            });
+
+            // Draw last seen positions
+            gameState.zombies.forEach(zombie => {
+                if (zombie.agent_type === 'zombie') {
+                    drawLastSeenPosition(zombie);
+                }
+            });
+
+            // Draw fugitive path if available
+            if (gameState.fugitive.agent_type == 'fugitive' && gameState.fugitive.current_path) {
+                drawAgentPath(gameState.fugitive.current_path, '#2196F3', 0.3);
+            }
+            if (gameState.fugitive.agent_type == 'fugitive') {
+                 drawVisionCone(gameState.fugitive);
+            }
+
+            // Draw trail
+            ctx.globalAlpha = 0.3;
+            trail.forEach((pos, i) => {
+                const alpha = i / trail.length;  // Fade older positions
+                ctx.globalAlpha = alpha * 0.5;
+                ctx.fillStyle = '#FFC107';
+                const x = pos.x * CELL_SIZE;
+                const y = pos.y * CELL_SIZE;
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Draw zombies
+            gameState.zombies.forEach(zombie => {
+                const pos = zombie.position;
+                drawAgent(pos[0], pos[1], '#9C27B0', '🧟');
+            });
+
+            // Draw fugitive (on top)
+            const fugitivePos = gameState.fugitive.position;
+            drawAgent(fugitivePos[0], fugitivePos[1], '#2196F3', '🏃');
+        }
+
+        function drawMaze() {
+            if (!mazeGrid) return;
+
+            const height = mazeGrid.length;
+            const width = mazeGrid[0].length;
+
+            // Draw each cell
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const cellType = mazeGrid[y][x];
+
+                    // Set color based on cell type
+                    if (cellType === 'wall') {
+                        ctx.fillStyle = '#333';
+                    } else {
+                        ctx.fillStyle = '#fff';
+                    }
+
+                    ctx.fillRect(
+                        x * CELL_SIZE,
+                        y * CELL_SIZE,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    );
+
+                    // Draw grid lines
+                    ctx.strokeStyle = '#e0e0e0';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(
+                        x * CELL_SIZE,
+                        y * CELL_SIZE,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    );
+                }
+            }
+        }
+
+        function drawMarker(x, y, color, emoji) {
+            const px = x * CELL_SIZE;
+            const py = y * CELL_SIZE;
+
+            // Draw circle
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(px, py, CELL_SIZE * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Draw emoji
+            ctx.font = `${CELL_SIZE * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(emoji, px, py);
+        }
+
+        function drawAgent(x, y, color, emoji) {
+            const px = x * CELL_SIZE;
+            const py = y * CELL_SIZE;
+
+            // Draw circle
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(px, py, CELL_SIZE * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw emoji
+            ctx.font = `${CELL_SIZE * 0.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(emoji, px, py);
+        }
+
+        function drawVisionCone(zombie) {
+            if (!zombie.vision_range || !zombie.vision_angle) return;
+
+            const pos = zombie.position;
+            const vel = zombie.velocity;
+
+            // Calculate facing direction from velocity
+            let facing;
+            const velLength = Math.sqrt(vel[0] * vel[0] + vel[1] * vel[1]);
+            if (velLength > 0.01) {
+                facing = { x: vel[0] / velLength, y: vel[1] / velLength };
+            } else {
+                facing = { x: 1.0, y: 0.0 }; // Default facing right
+            }
+
+            const range = zombie.vision_range * CELL_SIZE;
+            const halfAngle = zombie.vision_angle; // In radians
+
+            // Calculate cone edges
+            const facingAngle = Math.atan2(facing.y, facing.x);
+            const leftAngle = facingAngle + halfAngle;
+            const rightAngle = facingAngle - halfAngle;
+
+            // Draw cone
+            ctx.save();
+            ctx.globalAlpha = 0.15;
+            ctx.fillStyle = '#9C27B0'; // Purple, matching zombie color
+
+            ctx.beginPath();
+            ctx.moveTo(pos[0] * CELL_SIZE, pos[1] * CELL_SIZE);
+            ctx.arc(
+                pos[0] * CELL_SIZE,
+                pos[1] * CELL_SIZE,
+                range,
+                rightAngle,
+                leftAngle
+            );
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw cone edges
+            ctx.globalAlpha = 0.4;
+            ctx.strokeStyle = '#9C27B0';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(pos[0] * CELL_SIZE, pos[1] * CELL_SIZE);
+            ctx.lineTo(
+                pos[0] * CELL_SIZE + Math.cos(leftAngle) * range,
+                pos[1] * CELL_SIZE + Math.sin(leftAngle) * range
+            );
+            ctx.moveTo(pos[0] * CELL_SIZE, pos[1] * CELL_SIZE);
+            ctx.lineTo(
+                pos[0] * CELL_SIZE + Math.cos(rightAngle) * range,
+                pos[1] * CELL_SIZE + Math.sin(rightAngle) * range
+            );
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawAgentPath(path, color, alpha = 0.3) {
+            if (!path || path.length < 2) return;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]); // Dashed line
+
+            ctx.beginPath();
+            ctx.moveTo(path[0][0] * CELL_SIZE, path[0][1] * CELL_SIZE);
+
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i][0] * CELL_SIZE, path[i][1] * CELL_SIZE);
+            }
+
+            ctx.stroke();
+
+            // Draw waypoint circles
+            ctx.fillStyle = color;
+            ctx.globalAlpha = alpha * 1.5;
+            for (let i = 0; i < path.length; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    path[i][0] * CELL_SIZE,
+                    path[i][1] * CELL_SIZE,
+                    3,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        function drawLastSeenPosition(zombie) {
+            if (!zombie.last_seen_position) return;
+
+            const pos = zombie.last_seen_position;
+            const px = pos[0] * CELL_SIZE;
+            const py = pos[1] * CELL_SIZE;
+
+            // Draw pulsing circle
+            const time = Date.now() / 1000;
+            const pulse = Math.sin(time * 3) * 0.2 + 0.8;
+
+            ctx.save();
+            ctx.globalAlpha = 0.5 * pulse;
+            ctx.strokeStyle = '#FFC107'; // Yellow
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+
+            ctx.beginPath();
+            ctx.arc(px, py, CELL_SIZE * 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Draw X marker
+            ctx.strokeStyle = '#FFC107';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            const size = CELL_SIZE * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(px - size, py - size);
+            ctx.lineTo(px + size, py + size);
+            ctx.moveTo(px + size, py - size);
+            ctx.lineTo(px - size, py + size);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Initialize
+        updateButtons();
+    </script>
+</body>
+</html>
